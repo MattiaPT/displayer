@@ -42,8 +42,10 @@ lazy_static! {
 fn main() {
 
     let mut context = Context::new();
+/* example:
     let name = "Mattia";
     context.insert("name", &name);
+*/
     let contents = match TEMPLATES.render("index.html", &context) {
         Ok(s) => s,
         Err(e) => {
