@@ -10,6 +10,8 @@
     - https://tera.netlify.app/docs/
     - https://doc.rust-lang.org/book/ch20-01-single-threaded.html
     - https://github.com/Keats/tera/tree/master/examples
+
+    - https://developers.google.com/maps/documentation/javascript/examples/overlay-simple#maps_overlay_simple-javascript
 */
 
 #[macro_use]
