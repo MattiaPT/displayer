@@ -1,21 +1,69 @@
+/*
+    Author: Mattia
+    Date: 05.02.2023
+
+    This file should contain the main part of a imaging application
+    displaying a map where images can be found wherever they were
+    taken at.
+
+    useful links:
+    - https://tera.netlify.app/docs/
+    - https://doc.rust-lang.org/book/ch20-01-single-threaded.html
+    - https://github.com/Keats/tera/tree/master/examples
+*/
+
 #[macro_use]
 extern crate lazy_static;
 
-use tera::Tera;
-use std::net::{TcpListener, TcpStream};
-use std::io::{prelude::*, BufReader};
-use std::fs;
+use tera::{Context, Tera};
+use std::{
+    net::{TcpListener, TcpStream},
+    io::{prelude::*, BufReader}
+};
+
+
+/* SETTINGS */
+const PORT: i32 = 8000;
+
+
+lazy_static! {
+    pub static ref TEMPLATES: Tera = {
+        let tera = match Tera::new("src/templates/**/*.html") {
+            Ok(t) => t,
+            Err(e) => {
+                println!("Parsing error(s): {}", e);
+                ::std::process::exit(1);
+            }
+        };
+        tera
+    };
+}
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8000").unwrap();
+
+    let mut context = Context::new();
+    let name = "Mattia";
+    context.insert("name", &name);
+    let contents = match TEMPLATES.render("index.html", &context) {
+        Ok(s) => s,
+        Err(e) => {
+            println!("Error: {}", e);
+            ::std::process::exit(1);
+        }
+    };
+
+
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", PORT)).unwrap();
+
     for stream in listener.incoming() {
         let stream = stream.unwrap();
 
-        handle_connection(stream);
+        handle_connection(stream, &contents);
     }
 }
 
-fn handle_connection(mut stream: TcpStream) {
+
+fn handle_connection(mut stream: TcpStream, contents: &String) {
     let buf_reader = BufReader::new(&mut stream);
     let http_request: Vec<_> = buf_reader
         .lines()
@@ -24,7 +72,6 @@ fn handle_connection(mut stream: TcpStream) {
         .collect();
 
     let status_line = "HTTP/1.1 200 OK";
-    let contents = fs::read_to_string("templates/index.html").unwrap();
     let length = contents.len();
 
     let response = format!("{status_line}\r\nContentLength: {length}\r\n\r\n{contents}");
