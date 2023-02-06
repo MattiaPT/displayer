@@ -20,8 +20,10 @@ extern crate lazy_static;
 use tera::{Context, Tera};
 use std::{
     net::{TcpListener, TcpStream},
-    io::{prelude::*, BufReader}
+    io::{prelude::*, BufReader, Read},
+    fs::File
 };
+use image::{GenericImageView, ImageFormat};
 
 
 /* SETTINGS */
@@ -75,13 +77,34 @@ fn handle_connection(mut stream: TcpStream, contents: &String) {
         .take_while(|line| !line.is_empty())
         .collect();
 
-    let status_line = "HTTP/1.1 200 OK";
-    let length = contents.len();
+    let errorString = "404 Not Found".to_string();
+    let mut string = String::new();
 
-    let response = format!("{status_line}\r\nContentLength: {length}\r\n\r\n{contents}");
+    if http_request.len() == 0 {
+        let response = format!("HTTP/1.1 200 OK\r\nContentLength: 0\r\n\r\n{}", contents);
+        stream.write_all(response.as_bytes()).unwrap();
+        return;
+    }
+    let (status_line, response_body) = match http_request[0].split_whitespace().nth(1).unwrap() {
+        "/" => ("HTTP/1.1 200 OK", contents),
+        "/assets/image" => {
+            let mut buf = Vec::new();
+            let mut file = File::open("src/assets/IMG_9147.JPG").unwrap();
+            file.read_to_end(&mut buf).unwrap();
+            let image = image::load_from_memory(&buf).unwrap();
+            let format = ImageFormat::JPEG;
 
-    println!("Request: {:#?}", http_request);
-    println!("Response: {:#?}", response);
+            /**/
+            ("HTTP/1.1 200 OK", &string)
+        },
+        _ => ("HTTP/1.1 404 Not Found", &errorString),
+    };
+
+    let length = response_body.len();
+    let response = format!("HTTP/1.1 200 OK\r\nContentLength: {}\r\n\r\n{}", length, response_body);
+
+    // println!("Request: {:#?}", http_request);
+    // println!("Response: {:#?}", response);
 
     stream.write_all(response.as_bytes()).unwrap();
 }
