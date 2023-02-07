@@ -9,3 +9,8 @@ edition = "2021"
 lazy_static = "1.4.0"
 tera = "1"
 image = "0.23.0"
+askama = "0.9.0"
+axum = "0.6.4"
+askama_axum = { git = "https://github.com/djc/askama.git" }
+tokio = { version = "1.25.0", features = ["macros", "rt-multi-thread"] }
+log = "0.4.17"
