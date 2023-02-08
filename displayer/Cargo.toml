@@ -9,8 +9,11 @@ edition = "2021"
 lazy_static = "1.4.0"
 tera = "1"
 image = "0.23.0"
-askama = "0.9.0"
-axum = "0.6.4"
-askama_axum = { git = "https://github.com/djc/askama.git" }
+askama = { git = "https://github.com/djc/askama.git", rev = "fc779e22c3bfa0e94df208a88a361b99e28a9129", features = ["config", "with-axum"]}
+axum = { version = "0.5.0", features = ["multipart"]}
+askama_axum = { git = "https://github.com/djc/askama.git", rev = "fc779e22c3bfa0e94df208a88a361b99e28a9129"}
 tokio = { version = "1.25.0", features = ["macros", "rt-multi-thread"] }
 log = "0.4.17"
+clap = { version = "4.1.4", features = ["derive"] }
+kamadak-exif = "0.5.5"
+mime_guess = "2.0.4"

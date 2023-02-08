@@ -13,59 +13,146 @@
 
     - https://developers.google.com/maps/documentation/javascript/examples/overlay-simple#maps_overlay_simple-javascript
 */
+use std::path::PathBuf;
+use std::{fs, env};
+use log::{info, warn};
+use exif::{self, Tag, In, Rational};
 
-#[macro_use]
-extern crate lazy_static;
-
-use std::{
-    net::{TcpListener, TcpStream},
-    io::{prelude::*, BufReader, Read},
-    fs::File
-};
 use askama::Template;
 use askama_axum::IntoResponse;
-use axum::{
-    extract, 
-    http::StatusCode, 
-    response::{Html, Response}, 
-    routing::get, 
-    Router,
-    Extension,
-};
-use std::{
-    sync::Arc,
-    net::SocketAddr,
-};
-// use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use log::{info, warn};
+use axum::extract::{self, Extension};
+use clap::Parser;
+use tokio::fs;
 
-
-/* SETTINGS */
-const PORT: i32 = 8000;
-
-
-#[derive(Template)]
-#[template(path = "index.html")]
-struct TemplateInformation<'a> {
-    test: &'a String,
+#[derive(Parser)]
+struct Flags {
+    #[clap(long)]
+    port: u16,
+    #[clap(long)]
+    data: PathBuf,
 }
+
+#[derive(Template, Clone)]
+#[template(path = "index.html")]
+struct PageTemplate {
+    images: Vec<Image>,
+}
+
+#[derive(Clone)]
+struct Image {
+    path: String,
+    latitude_deg: f64,
+    longitude_deg: f64,
+}
+
+async fn toDegrees(rationals: &exif::Value) -> f64 {
+    let rationals = match *rationals {
+        exif::Value::Rational(ref rationals) => rationals,
+        _ => unreachable!()
+    };
+
+    let mut total = 0.0;
+    let mut weight = 1.0;
+    for i in 0..3 {
+        total += rationals[i].num as f64 / rationals[i].denom as f64 * weight;
+        weight /= 60.0;
+    }
+
+    total
+}
+
+async fn asset(
+    extract::Path(filename): extract::Path<String>,
+) -> axum::response::Response {
+    let asset = match tokio::fs::read(common.data_folder.join(filename)).await {
+        Ok(a) => a,
+        Err(_) => {
+            return axum::http::StatusCode::NOT_FOUND.into_response();
+        }
+    };
+    let mime = if let Some(mime) = mime_guess::from_path(filename).first_raw() {
+        mime
+    } else {
+        return axum::http::StatusCode::NOT_FOUND.into_response();
+    };
+    ([("Content-Type", mime)], &asset.to_vec()).into_response()
+}
+
 
 #[tokio::main]
 async fn main() {
-    let t = TemplateInformation{ test: &"Mattia".to_string() };
+    let args = Flags::parse();
 
-    let app = Router::new()
-        .route("/", get(root));
+    let mut images = Vec::new();
 
-    axum::Server::bind(&format!("0.0.0.0:{}", PORT).parse().unwrap())
+    let files = fs::read_dir(args.data).unwrap();
+    for path in files {
+        if path.as_ref().unwrap().path().extension().unwrap() != "JPG" {
+            continue
+        }
+        
+        let file = fs::File::open(path.as_ref().unwrap().path()).unwrap();
+        let mut bufreader = std::io::BufReader::new(&file);
+        let exifreader = exif::Reader::new();
+        let exif = exifreader.read_from_container(&mut bufreader).unwrap();
+
+        let longitude_vals = match exif.get_field(Tag::GPSLongitude, In::PRIMARY) {
+            Some(field) => match field.value {
+                exif::Value::Rational(ref rationals) => rationals,
+                _ => unreachable!()
+            },
+            None => {
+                continue;
+            }
+        };
+
+        let longitude_deg = toDegrees(&exif::Value::Rational(longitude_vals.to_vec())).await;
+
+        let latitude_vals = match exif.get_field(Tag::GPSLatitude, In::PRIMARY) {
+            Some(field) => match field.value {
+                exif::Value::Rational(ref rationals) => rationals,
+                _ => unreachable!()
+            },
+            None => {
+                continue;
+            }
+        };
+
+        let latitude_deg = toDegrees(&exif::Value::Rational(latitude_vals.to_vec())).await;
+
+        images.push(Image {
+            path: format!("./{}", path.as_ref().unwrap().path().strip_prefix(env::current_dir().unwrap()).expect("Failed to strip prefix from file path").display()),
+            latitude_deg,
+            longitude_deg
+        });
+
+
+        println!("Added file: {}", path
+            .unwrap()
+            .path()
+            .strip_prefix(env::current_dir().unwrap())
+            .expect("Failed to strip prefix from file path")
+            .display());
+    }
+
+
+
+    let t = PageTemplate{ images };
+
+    let app = axum::Router::new()
+        .route("/", axum::routing::get(root))
+        .route("/src/assets/:filename", axum::routing::get(asset))
+        .layer(Extension(t.clone()));
+
+    axum::Server::bind(&format!("0.0.0.0:{}", args.port).parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
-    info!("Listening on : localhost:{}", PORT);
+    println!("Listening on : localhost:{}", args.port);
 }
 
 async fn root(
-    Extension(templateInformation): Extension<TemplateInformation<'_>>
+    Extension(images): Extension<PageTemplate>,
 ) -> axum::response::Response {
-    templateInformation.into_response()
+    images.into_response()
 }

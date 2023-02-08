@@ -16,7 +16,9 @@
     </style>
 </head>
 <body>
-	<h1>{{ test }}</h1>
+	{% for path in images %}
+	<h1>{{ path.path }}</h1>
+	{% endfor %}
 	<div id="map"></div>
 	<script>
 	function initMap() {
@@ -25,9 +27,11 @@
 	    	center: { lat: 47.36667, lng: 8.55 },
 	    	mapTypeId: "satellite",
 		});
-		const srcImage = "./src/assets/IMG_9147.JPG";
-		
-		const bounds = new google.maps.LatLngBounds(
+	{% for image in images %}
+		{% if loop.first %}
+		var srcImage = "{{ image.path }}";
+
+		var bounds = new google.maps.LatLngBounds(
 			new google.maps.LatLng(0, 0),
 			new google.maps.LatLng(50, 50)
 		);
@@ -37,12 +41,27 @@
 			srcImage,
 			bounds
 		);
+		{% else %}
+		srcImage = "{{ image.path }}";
+		
+		bounds = new google.maps.LatLngBounds(
+			new google.maps.LatLng(0, 0),
+			new google.maps.LatLng(50, 50)
+		);
+		
+
+		voverlay = new google.maps.GroundOverlay(
+			srcImage,
+			bounds
+		);
+		{% endif %}
 		overlay.setMap(map);
+	{% endfor %}
 	}
 	</script>
 	<script 
 	async
-	src="https://maps.googleapis.com/maps/api/js?key={ apiKey }&callback=initMap"
+	src="https://maps.googleapis.com/maps/api/js?key={api key}&callback=initMap"
     defer
 	></script>
 </body>
