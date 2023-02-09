@@ -22,7 +22,12 @@ use askama::Template;
 use askama_axum::IntoResponse;
 use axum::extract::{self, Extension};
 use clap::Parser;
-use tokio::fs;
+use tokio::sync::Notify;
+
+use axum::response::Response;
+use mime_guess::mime;
+use std::fs::File;
+use std::io::Read;
 
 #[derive(Parser)]
 struct Flags {
@@ -64,18 +69,20 @@ async fn toDegrees(rationals: &exif::Value) -> f64 {
 async fn asset(
     extract::Path(filename): extract::Path<String>,
 ) -> axum::response::Response {
-    let asset = match tokio::fs::read(common.data_folder.join(filename)).await {
+    let asset = match tokio::fs::read(format!("/home/mattia/git/mattiapt/displayer/displayer/src/assets/{}", filename)).await {
         Ok(a) => a,
         Err(_) => {
             return axum::http::StatusCode::NOT_FOUND.into_response();
         }
     };
+
     let mime = if let Some(mime) = mime_guess::from_path(filename).first_raw() {
         mime
     } else {
         return axum::http::StatusCode::NOT_FOUND.into_response();
     };
-    ([("Content-Type", mime)], &asset.to_vec()).into_response()
+    let res = ([("Content-Type", mime)], (&asset).to_vec()).into_response();
+    res
 }
 
 

@@ -16,9 +16,6 @@
     </style>
 </head>
 <body>
-	{% for path in images %}
-	<h1>{{ path.path }}</h1>
-	{% endfor %}
 	<div id="map"></div>
 	<script>
 	function initMap() {
@@ -61,7 +58,7 @@
 	</script>
 	<script 
 	async
-	src="https://maps.googleapis.com/maps/api/js?key={api key}&callback=initMap"
+	src="https://maps.googleapis.com/maps/api/js?key={ api key }&callback=initMap"
     defer
 	></script>
 </body>
