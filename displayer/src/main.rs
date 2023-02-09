@@ -69,7 +69,7 @@ async fn toDegrees(rationals: &exif::Value) -> f64 {
 async fn asset(
     extract::Path(filename): extract::Path<String>,
 ) -> axum::response::Response {
-    let asset = match tokio::fs::read(format!("/home/mattia/git/mattiapt/displayer/displayer/src/assets/{}", filename)).await {
+    let asset = match tokio::fs::read(format!("/media/mattia/Backup - Video/Europareise_2022/Fotos_Flurin/{}", filename)).await {
         Ok(a) => a,
         Err(_) => {
             return axum::http::StatusCode::NOT_FOUND.into_response();
@@ -94,14 +94,19 @@ async fn main() {
 
     let files = fs::read_dir(args.data).unwrap();
     for path in files {
-        if path.as_ref().unwrap().path().extension().unwrap() != "JPG" {
+        if path.as_ref().unwrap().path().extension().unwrap().to_ascii_uppercase() != "JPG" {
             continue
         }
         
         let file = fs::File::open(path.as_ref().unwrap().path()).unwrap();
         let mut bufreader = std::io::BufReader::new(&file);
         let exifreader = exif::Reader::new();
-        let exif = exifreader.read_from_container(&mut bufreader).unwrap();
+        let exif = match exifreader.read_from_container(&mut bufreader) {
+            Ok(t) => t,
+            Err(_) => {
+                continue;
+            }
+        };
 
         let longitude_vals = match exif.get_field(Tag::GPSLongitude, In::PRIMARY) {
             Some(field) => match field.value {
@@ -128,7 +133,7 @@ async fn main() {
         let latitude_deg = toDegrees(&exif::Value::Rational(latitude_vals.to_vec())).await;
 
         images.push(Image {
-            path: format!("./{}", path.as_ref().unwrap().path().strip_prefix(env::current_dir().unwrap()).expect("Failed to strip prefix from file path").display()),
+            path: format!("{}", path.as_ref().unwrap().path().display()),
             latitude_deg,
             longitude_deg
         });
@@ -137,8 +142,6 @@ async fn main() {
         println!("Added file: {}", path
             .unwrap()
             .path()
-            .strip_prefix(env::current_dir().unwrap())
-            .expect("Failed to strip prefix from file path")
             .display());
     }
 

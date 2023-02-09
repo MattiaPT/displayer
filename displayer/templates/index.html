@@ -24,41 +24,20 @@
 	    	center: { lat: 47.36667, lng: 8.55 },
 	    	mapTypeId: "satellite",
 		});
+
+
 	{% for image in images %}
-		{% if loop.first %}
-		var srcImage = "{{ image.path }}";
-
-		var bounds = new google.maps.LatLngBounds(
-			new google.maps.LatLng(0, 0),
-			new google.maps.LatLng(50, 50)
-		);
-		
-
-		var overlay = new google.maps.GroundOverlay(
-			srcImage,
-			bounds
-		);
-		{% else %}
-		srcImage = "{{ image.path }}";
-		
-		bounds = new google.maps.LatLngBounds(
-			new google.maps.LatLng(0, 0),
-			new google.maps.LatLng(50, 50)
-		);
-		
-
-		voverlay = new google.maps.GroundOverlay(
-			srcImage,
-			bounds
-		);
-		{% endif %}
-		overlay.setMap(map);
+		new google.maps.Marker({
+			position: {lat: {{ image.latitude_deg }}, lng: {{ image.longitude_deg}} },
+			map,
+			title: "{{ image.path }}",
+		});
 	{% endfor %}
 	}
 	</script>
 	<script 
 	async
-	src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAMhdmFdWtlpz5AS3jTPE6vz9J5nemSQ8&callback=initMap"
+	src="https://maps.googleapis.com/maps/api/js?key={ api key }&callback=initMap"
     defer
 	></script>
 </body>
