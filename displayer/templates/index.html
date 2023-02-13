@@ -1,8 +1,12 @@
+<!DOCTYPE html>
+<html style="background-color: #202124; color: white;">
 <head>
 	<title>Displayer</title>
 	<script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
-
-    <style type="text/css">
+	<script src="https://d3js.org/d3.v7.min.js"></script>
+	<script type="text/javascript" src="https://code.jquery.com/jquery-1.7.1.min.js"></script>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/ion-rangeslider/2.3.1/js/ion.rangeSlider.min.js"></script>
+	<style type="text/css">
     	#map {
 			height: 100%;
 		}
@@ -15,29 +19,75 @@
 		}
     </style>
 </head>
-<body>
-	<div id="map"></div>
 	<script>
+	var options = { year: 'numeric', month: 'numeric', day: 'numeric' };
+
+	{% for image in images %}
+	var marker{{ image.id }}; 
+	{% endfor %}
 	function initMap() {
 	  	const map = new google.maps.Map(document.getElementById("map"), {
-	    	zoom: 11,
+	    	zoom: 8,
 	    	center: { lat: 47.36667, lng: 8.55 },
 	    	mapTypeId: "satellite",
 		});
 
 
 	{% for image in images %}
-		new google.maps.Marker({
+		marker{{ image.id }} = new google.maps.Marker({
 			position: {lat: {{ image.latitude_deg }}, lng: {{ image.longitude_deg}} },
 			map,
-			title: "{{ image.path }}",
+			title: "{{ image.path }}".replaceAll("slash", "/"),
 		});
+
+		marker{{ image.id }}.addListener("click", () => {
+			document.getElementById("image").src = "assets/{{ image.path }}";
+			document.getElementById("imageDate").innerHTML = (new Date(parseInt({{ image.image_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }})*1000)).toLocaleDateString("en-US", options)
+	    });
+
 	{% endfor %}
 	}
+
+	function updateSlider(slideAmount) {
+	{% for image in images %}
+		if ({{ image.image_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }} >= parseInt(slideAmount) - {{ delta.num_seconds() }} && 
+			{{ image.image_date_time.naive_utc().and_hms_opt(23, 59, 59).unwrap().timestamp() }} <= parseInt(slideAmount) + {{ delta.num_seconds() }}) {
+			marker{{ image.id }}.setVisible(true);
+		} else {
+			marker{{ image.id }}.setVisible(false);
+		}
+	{% endfor %}
+        var sliderDiv = document.getElementById("sliderAmount");
+        sliderDiv.innerHTML = (new Date(parseInt(slideAmount)*1000)).toLocaleDateString("en-US", options);
+    }
+
 	</script>
 	<script 
 	async
-	src="https://maps.googleapis.com/maps/api/js?key={ api key }&callback=initMap"
+	src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAMhdmFdWtlpz5AS3jTPE6vz9J5nemSQ8&callback=initMap"
     defer
 	></script>
+<body>
+	<table style="height: 100%; width: 100%;">
+		<tr>
+			<td style="width: 75%; height: 100%;">
+				<div id="map"></div>
+			</td>
+			<td>
+				<table id="content" style="height: 100%; width: 100%;">
+					<tr style="height: 10%; width: 100%; "><td style="text-align: center">
+						<input type="range" min="{{ first_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }}" max="{{ last_date_time.naive_utc().and_hms_opt(23, 59, 59).unwrap().timestamp() }}" value="{{ first_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }}" class="slider" id="date" onchange="updateSlider(this.value)" style="width: 80%">
+						<p><output id="sliderAmount"> </output></p>
+					</td></tr>
+					<tr style="height: 90%;"><td>
+						<p id="imageDate"></p>
+						<img id="image" style="width: 100%;">
+					</td></tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+	
 </body>
+</html>
+
