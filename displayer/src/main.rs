@@ -48,8 +48,8 @@ struct Flags {
 #[template(path = "index.html")]
 struct PageTemplate {
     images: Vec<Image>,
-    first_date_time: Date<Local>,
-    last_date_time: Date<Local>,
+    first_date_time: i64,
+    last_date_time: i64,
     delta: Duration,
 }
 
@@ -57,7 +57,7 @@ struct PageTemplate {
 struct Image {
     id: u64,
     path: String,
-    image_date_time: Date<Local>,
+    image_date_time_naive: NaiveDateTime,
     latitude_deg: f64,
     longitude_deg: f64,
 }
@@ -146,14 +146,13 @@ async fn main() {
             },
             None => continue
         };
-        let image_date_time_naive = &match NaiveDateTime::parse_from_str(&String::from_utf8(date_time_original[0].clone()).unwrap(), "%Y:%m:%d %H:%M:%S") {
+        let image_date_time_naive = match NaiveDateTime::parse_from_str(&String::from_utf8(date_time_original[0].clone()).unwrap(), "%Y:%m:%d %H:%M:%S") {
             Ok(t) => t,
             Err(e) => {
                 println!("{:?}", e);
                 std::process::exit(1)
             }
         };
-        let image_date_time = Local.from_local_datetime(image_date_time_naive).unwrap().date();
 
         let longitude_deg = to_degrees(&exif::Value::Rational(longitude_vals.to_vec())).await;
 
@@ -173,7 +172,7 @@ async fn main() {
         images.push(Image {
             id: i,
             path: str::replace(&format!("{}", path.as_path().display()), "/", "slash"),
-            image_date_time,
+            image_date_time_naive,
             latitude_deg,
             longitude_deg
         });
@@ -184,13 +183,15 @@ async fn main() {
             .display());
     }
 
-    let first_date_time = images.iter().map(|image| Local.from_local_datetime(&image.image_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap()).unwrap().timestamp()).min().unwrap();
-    let last_date_time = images.iter().map(|image| Local.from_local_datetime(&image.image_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap()).unwrap().timestamp()).max().unwrap();
+    let first_date_time = images.iter().map(|image| image.image_date_time_naive.timestamp()).min().unwrap();
+    let last_date_time = images.iter().map(|image| image.image_date_time_naive.timestamp()).max().unwrap();
+
+    images.sort_by_key(|a| a.image_date_time_naive.timestamp());
 
     let t = PageTemplate{ 
         images,
-        first_date_time: Local.from_local_datetime(&NaiveDateTime::from_timestamp_opt(first_date_time, 0).unwrap()).unwrap().date(),
-        last_date_time: Local.from_local_datetime(&NaiveDateTime::from_timestamp_opt(last_date_time, 0).unwrap()).unwrap().date(),
+        first_date_time: first_date_time,
+        last_date_time: last_date_time,
         delta: Duration::days(args.delta)
     };
 

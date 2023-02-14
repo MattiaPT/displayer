@@ -26,7 +26,7 @@
 		@media screen and (-webkit-min-device-pixel-ratio:0) {
 		    input[type='range'] {
 		      overflow: hidden;
-		      width: 80px;
+		      width: 80%;
 		      -webkit-appearance: none;
 		    }
 		    
@@ -43,7 +43,7 @@
 		      height: 10px;
 		      cursor: ew-resize;
 		      background: #a8a8a8;
-		      box-shadow: -80px 0 0 80px #43e5f7;
+		      box-shadow: -300px 0 0 300px #43e5f7;
 		    }
 		}
 		input[type="range"]::-moz-range-progress {
@@ -81,7 +81,7 @@
 									</button>
 								</td>
 								<td style="text-align: center; ">
-									<input type="range" min="{{ first_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }}" max="{{ last_date_time.naive_utc().and_hms_opt(23, 59, 59).unwrap().timestamp() }}" value="{{ first_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }}" class="slider" id="date" style="width: 80%; background-color: #202124;">
+									<input type="range" min="{{ first_date_time }}" max="{{ last_date_time }}" value="{{ first_date_time }}" class="slider" id="date" style="width: 80%; background-color: #202124;">
 								</td>
 							</tr>
 							<tr>
@@ -115,8 +115,13 @@
 	    	mapTypeId: "satellite",
 		});
 
-
+	  	var travelCoordinates = [];
 	{% for image in images %}
+		travelCoordinates.push({
+			lat: {{ image.latitude_deg }}, 
+			lng: {{ image.longitude_deg}},
+		});
+
 		marker{{ image.id }} = new google.maps.Marker({
 			position: {lat: {{ image.latitude_deg }}, lng: {{ image.longitude_deg}} },
 			map,
@@ -125,10 +130,19 @@
 
 		marker{{ image.id }}.addListener("click", () => {
 			document.getElementById("image").src = "assets/{{ image.path }}";
-			document.getElementById("imageDate").innerHTML = "(" + (new Date({{ image.image_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }}*1000)).toLocaleDateString("en-US", options) + ")";
+			document.getElementById("imageDate").innerHTML = "(" + (new Date({{ image.image_date_time_naive.timestamp() }}*1000)).toLocaleDateString("en-US", options) + ")";
 	    });
 
 	{% endfor %}
+		console.log(travelCoordinates);
+		const travelPath = new google.maps.Polyline({
+			path: travelCoordinates,
+			geodesic: true,
+		    strokeColor: "#FF0000",
+		    strokeOpacity: 0.8,
+		    strokeWeight: 3,
+		});
+		travelPath.setMap(map);
 	}
 
 
@@ -139,7 +153,7 @@
 	function playSlideShow() {
 		slideShowStatus = true;
 		setInterval(function(){
-		    if (!slideShowStatus || {{ last_date_time.naive_utc().and_hms_opt(23, 59, 59).unwrap().timestamp() }} == parseInt(slider.value)) {
+		    if (!slideShowStatus || {{ last_date_time }} == parseInt(slider.value)) {
 		    	return;
 		    }
 		    document.getElementById('date').value = parseInt(document.getElementById('date').value) + 3600;
@@ -155,12 +169,12 @@
 		var imagePath = "";
 		var timestamp = 0;
 	{% for image in images %}
-		if ({{ image.image_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }} >= parseInt(slider.value) - {{ delta.num_seconds() }} && 
-			{{ image.image_date_time.naive_utc().and_hms_opt(23, 59, 59).unwrap().timestamp() }} <= parseInt(slider.value) + {{ delta.num_seconds() }}) {
-			if (distance > Math.abs({{ image.image_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }} - parseInt(slider.value))) {
-				distance = Math.abs({{ image.image_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }} - parseInt(slider.value));
+		if ({{ image.image_date_time_naive.timestamp() }} >= parseInt(slider.value) - {{ delta.num_seconds() }} && 
+			{{ image.image_date_time_naive.timestamp() }} <= parseInt(slider.value) + {{ delta.num_seconds() }}) {
+			if (distance > Math.abs({{ image.image_date_time_naive.timestamp() }} - parseInt(slider.value))) {
+				distance = Math.abs({{ image.image_date_time_naive.timestamp() }} - parseInt(slider.value));
 				imagePath = "assets/{{ image.path }}";
-				timestamp = {{ image.image_date_time.naive_utc().and_hms_opt(0, 0, 0).unwrap().timestamp() }}
+				timestamp = {{ image.image_date_time_naive.timestamp() }}
 			}
 			marker{{ image.id }}.setVisible(true);
 		} else {
