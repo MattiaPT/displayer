@@ -40,6 +40,8 @@ struct Flags {
     port: u16,
     #[clap(long)]
     data: PathBuf,
+    #[clap(long)]
+    delta: i64,
 }
 
 #[derive(Template, Clone)]
@@ -189,7 +191,7 @@ async fn main() {
         images,
         first_date_time: Local.from_local_datetime(&NaiveDateTime::from_timestamp_opt(first_date_time, 0).unwrap()).unwrap().date(),
         last_date_time: Local.from_local_datetime(&NaiveDateTime::from_timestamp_opt(last_date_time, 0).unwrap()).unwrap().date(),
-        delta: Duration::days(3)
+        delta: Duration::days(args.delta)
     };
 
     let app = axum::Router::new()
