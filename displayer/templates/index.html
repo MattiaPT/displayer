@@ -85,8 +85,11 @@
 								</td>
 							</tr>
 							<tr>
-								<td></td><td></td>
-								<td style="text-align: center; "><p><output id="sliderAmount"></output></p></td>
+								<td colspan="2">
+									<button class="btn btn-primary" type="button" onclick="displayAll()" style="color: #202124; background-color: #13bba4 !important; border-color: #202124">
+										Display All
+									</button>
+								</td>
 							</tr>
 						</table>
 					</td></tr>
@@ -103,6 +106,8 @@
 </html>
 <script>
 	var options = { year: 'numeric', month: 'numeric', day: 'numeric' };
+	var slider = document.getElementById("date");
+	const pinPath = "https://img.icons8.com/ios/256/map-pin.png";
 	var slideShowStatus = false;
 
 	{% for image in images %}
@@ -131,6 +136,13 @@
 		marker{{ image.id }}.addListener("click", () => {
 			document.getElementById("image").src = "assets/{{ image.path }}";
 			document.getElementById("imageDate").innerHTML = "(" + (new Date({{ image.image_date_time_naive.timestamp() }}*1000)).toLocaleDateString("en-US", options) + ")";
+			slider.value = {{ image.image_date_time_naive.timestamp() }};
+			marker{{ image.id }}.setAnimation(google.maps.Animation.BOUNCE);
+			{% for i in images %}
+			{% if image.id != i.id %}
+			marker{{ i.id }}.setAnimation(null);
+			{% endif %}
+			{% endfor %}
 	    });
 
 	{% endfor %}
@@ -145,8 +157,6 @@
 		travelPath.setMap(map);
 	}
 
-
-	var slider = document.getElementById("date");
 
 	slider.addEventListener('input', sliderChanged, false);
 
@@ -164,27 +174,37 @@
 		slideShowStatus = false;
 	}
 
+	function displayAll() {
+	{% for image in images %}
+		marker{{ image.id }}.setVisible(true);
+	{% endfor %}
+	}
+
 	function sliderChanged() {
 		var distance = Number.MAX_SAFE_INTEGER;
 		var imagePath = "";
 		var timestamp = 0;
+		var closestMarker = null;
 	{% for image in images %}
 		if ({{ image.image_date_time_naive.timestamp() }} >= parseInt(slider.value) - {{ delta.num_seconds() }} && 
 			{{ image.image_date_time_naive.timestamp() }} <= parseInt(slider.value) + {{ delta.num_seconds() }}) {
 			if (distance > Math.abs({{ image.image_date_time_naive.timestamp() }} - parseInt(slider.value))) {
 				distance = Math.abs({{ image.image_date_time_naive.timestamp() }} - parseInt(slider.value));
 				imagePath = "assets/{{ image.path }}";
-				timestamp = {{ image.image_date_time_naive.timestamp() }}
+				timestamp = {{ image.image_date_time_naive.timestamp() }};
+				closestMarker = marker{{ image.id }};
 			}
 			marker{{ image.id }}.setVisible(true);
 		} else {
 			marker{{ image.id }}.setVisible(false);
 		}
+		marker{{ image.id }}.setAnimation(null);
 	{% endfor %}
 		document.getElementById("image").src = imagePath;
 		document.getElementById("imageDate").innerHTML = "(" + (new Date(timestamp*1000)).toLocaleDateString("en-US", options) + ")";
-        var sliderDiv = document.getElementById("sliderAmount");
-        sliderDiv.innerHTML = "Center: " + (new Date(parseInt(slider.value)*1000)).toLocaleDateString("en-US", options);
+		closestMarker.setAnimation(google.maps.Animation.BOUNCE);
+//        var sliderDiv = document.getElementById("sliderAmount");
+//        sliderDiv.innerHTML = "Center: " + (new Date(parseInt(slider.value)*1000)).toLocaleDateString("en-US", options);
 	}
 </script>
 <script 
