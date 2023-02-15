@@ -105,48 +105,48 @@
 </body>
 </html>
 <script>
+	// TODO: fix path generation
+	const REPLACEMENT = "slash";
+
 	var options = { year: 'numeric', month: 'numeric', day: 'numeric' };
 	var slider = document.getElementById("date");
-	const pinPath = "https://img.icons8.com/ios/256/map-pin.png";
 	var slideShowStatus = false;
+	var currentlyBouncing = null;
 
-	{% for image in images %}
-	var marker{{ image.id }}; 
-	{% endfor %}
 	function initMap() {
+		var bounds = new google.maps.LatLngBounds();
+
 	  	const map = new google.maps.Map(document.getElementById("map"), {
-	    	zoom: 8,
-	    	center: { lat: 47.36667, lng: 8.55 },
 	    	mapTypeId: "satellite",
 		});
 
 	  	var travelCoordinates = [];
 	{% for image in images %}
 		travelCoordinates.push({
-			lat: {{ image.latitude_deg }}, 
-			lng: {{ image.longitude_deg}},
+			lat: {{ image.latlon.latitude_deg }}, 
+			lng: {{ image.latlon.longitude_deg }},
 		});
 
-		marker{{ image.id }} = new google.maps.Marker({
-			position: {lat: {{ image.latitude_deg }}, lng: {{ image.longitude_deg}} },
+		window.marker{{ image.id }} = new google.maps.Marker({
+			position: {lat: {{ image.latlon.latitude_deg }}, lng: {{ image.latlon.longitude_deg}} },
 			map,
-			title: "{{ image.path }}".replaceAll("slash", "/"),
+			title: "{{ image.path }}".replaceAll(REPLACEMENT, "/"),
 		});
 
-		marker{{ image.id }}.addListener("click", () => {
+		bounds.extend(window.marker{{ image.id }}.position);
+
+		window.marker{{ image.id }}.addListener("click", () => {
 			document.getElementById("image").src = "assets/{{ image.path }}";
 			document.getElementById("imageDate").innerHTML = "(" + (new Date({{ image.image_date_time_naive.timestamp() }}*1000)).toLocaleDateString("en-US", options) + ")";
 			slider.value = {{ image.image_date_time_naive.timestamp() }};
-			marker{{ image.id }}.setAnimation(google.maps.Animation.BOUNCE);
-			{% for i in images %}
-			{% if image.id != i.id %}
-			marker{{ i.id }}.setAnimation(null);
-			{% endif %}
-			{% endfor %}
+			window.marker{{ image.id }}.setAnimation(google.maps.Animation.BOUNCE);
+			if (currentlyBouncing != null) {
+				currentlyBouncing.setAnimation(null);
+			}
+			currentlyBouncing = window.marker{{ image.id }};
 	    });
 
 	{% endfor %}
-		console.log(travelCoordinates);
 		const travelPath = new google.maps.Polyline({
 			path: travelCoordinates,
 			geodesic: true,
@@ -155,6 +155,7 @@
 		    strokeWeight: 3,
 		});
 		travelPath.setMap(map);
+		map.fitBounds(bounds);
 	}
 
 
@@ -176,7 +177,7 @@
 
 	function displayAll() {
 	{% for image in images %}
-		marker{{ image.id }}.setVisible(true);
+		window.marker{{ image.id }}.setVisible(true);
 	{% endfor %}
 	}
 
@@ -192,19 +193,17 @@
 				distance = Math.abs({{ image.image_date_time_naive.timestamp() }} - parseInt(slider.value));
 				imagePath = "assets/{{ image.path }}";
 				timestamp = {{ image.image_date_time_naive.timestamp() }};
-				closestMarker = marker{{ image.id }};
+				closestMarker = window.marker{{ image.id }};
 			}
-			marker{{ image.id }}.setVisible(true);
+			window.marker{{ image.id }}.setVisible(true);
 		} else {
-			marker{{ image.id }}.setVisible(false);
+			window.marker{{ image.id }}.setVisible(false);
 		}
-		marker{{ image.id }}.setAnimation(null);
+		window.marker{{ image.id }}.setAnimation(null);
 	{% endfor %}
 		document.getElementById("image").src = imagePath;
 		document.getElementById("imageDate").innerHTML = "(" + (new Date(timestamp*1000)).toLocaleDateString("en-US", options) + ")";
 		closestMarker.setAnimation(google.maps.Animation.BOUNCE);
-//        var sliderDiv = document.getElementById("sliderAmount");
-//        sliderDiv.innerHTML = "Center: " + (new Date(parseInt(slider.value)*1000)).toLocaleDateString("en-US", options);
 	}
 </script>
 <script 

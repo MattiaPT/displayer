@@ -13,26 +13,17 @@
 
     - https://developers.google.com/maps/documentation/javascript/examples/overlay-simple#maps_overlay_simple-javascript
 */
-use std::path::PathBuf;
-use std::fs::metadata;
-use std::ffi::OsStr;
-use std::{fs, env};
-use std::fs::DirEntry;
-use log::{info, warn};
-use exif::{self, Tag, In, Rational};
+use std::{ffi::OsStr, fs, path::PathBuf};
 
 use askama::Template;
 use askama_axum::IntoResponse;
 use axum::extract::{self, Extension};
+use chrono::{Duration, NaiveDateTime};
 use clap::Parser;
-use tokio::sync::Notify;
+use log::info;
 
-use axum::response::Response;
-use mime_guess::mime;
-use std::fs::File;
-use std::io::Read;
+use exif::{self, In, Tag};
 use walkdir::WalkDir;
-use chrono::{offset::TimeZone, NaiveDateTime, Local, DateTime, Datelike, Date, Duration};
 
 #[derive(Parser)]
 struct Flags {
@@ -58,14 +49,23 @@ struct Image {
     id: u64,
     path: String,
     image_date_time_naive: NaiveDateTime,
+    latlon: LatLon,
+}
+
+#[derive(Clone)]
+struct LatLon {
     latitude_deg: f64,
     longitude_deg: f64,
 }
 
+// TODO: fix path generation
+const REPLACEMENT: &str = "slash";
+
+
 async fn to_degrees(rationals: &exif::Value) -> f64 {
     let rationals = match *rationals {
         exif::Value::Rational(ref rationals) => rationals,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
 
     let mut total = 0.0;
@@ -78,10 +78,8 @@ async fn to_degrees(rationals: &exif::Value) -> f64 {
     total
 }
 
-async fn asset(
-    extract::Path(filename): extract::Path<String>,
-) -> axum::response::Response {
-    let f_name = str::replace(&filename, "slash", "/");
+async fn asset(extract::Path(filename): extract::Path<String>) -> axum::response::Response {
+    let f_name = str::replace(&filename, REPLACEMENT, "/");
     let asset = match tokio::fs::read(format!("{}", f_name)).await {
         Ok(a) => a,
         Err(_) => {
@@ -99,16 +97,24 @@ async fn asset(
 }
 
 async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
-        let mut files: Vec<PathBuf> = Vec::new();
-        let directory_path: PathBuf = PathBuf::from(format!("{}", (*directory).clone().as_path().display()));
-        for file in WalkDir::new(directory_path).into_iter().filter_map(|file| file.ok()) {
-            if !["JPG", "JPEG", "PNG"].iter().any(|extension| file.path().extension() != None && OsStr::new(extension) == file.path().extension().unwrap().to_ascii_uppercase()) {
-                continue;
-            }
-            files.push(file.path().to_path_buf());
+    let mut files: Vec<PathBuf> = Vec::new();
+    let directory_path: PathBuf =
+        PathBuf::from(format!("{}", (*directory).clone().as_path().display()));
+    for file in WalkDir::new(directory_path)
+        .into_iter()
+        .filter_map(|file| file.ok())
+    {
+        if !["JPG", "JPEG", "PNG"].iter().any(|extension| {
+            file.path().extension() != None
+                && OsStr::new(extension) == file.path().extension().unwrap().to_ascii_uppercase()
+        }) {
+            continue;
         }
-        files
+        files.push(file.path().to_path_buf());
+    }
+    files
 }
+
 
 #[tokio::main]
 async fn main() {
@@ -133,7 +139,7 @@ async fn main() {
         let longitude_vals = match exif.get_field(Tag::GPSLongitude, In::PRIMARY) {
             Some(field) => match field.value {
                 exif::Value::Rational(ref rationals) => rationals,
-                _ => unreachable!()
+                _ => unreachable!(),
             },
             None => {
                 continue;
@@ -142,11 +148,14 @@ async fn main() {
         let date_time_original = match exif.get_field(Tag::DateTimeOriginal, In::PRIMARY) {
             Some(field) => match field.value {
                 exif::Value::Ascii(ref ascii) => ascii,
-                _ => unreachable!()
+                _ => unreachable!(),
             },
-            None => continue
+            None => continue,
         };
-        let image_date_time_naive = match NaiveDateTime::parse_from_str(&String::from_utf8(date_time_original[0].clone()).unwrap(), "%Y:%m:%d %H:%M:%S") {
+        let image_date_time_naive = match NaiveDateTime::parse_from_str(
+            &String::from_utf8(date_time_original[0].clone()).unwrap(),
+            "%Y:%m:%d %H:%M:%S",
+        ) {
             Ok(t) => t,
             Err(e) => {
                 println!("{:?}", e);
@@ -159,7 +168,7 @@ async fn main() {
         let latitude_vals = match exif.get_field(Tag::GPSLatitude, In::PRIMARY) {
             Some(field) => match field.value {
                 exif::Value::Rational(ref rationals) => rationals,
-                _ => unreachable!()
+                _ => unreachable!(),
             },
             None => {
                 continue;
@@ -171,34 +180,41 @@ async fn main() {
         i += 1;
         images.push(Image {
             id: i,
-            path: str::replace(&format!("{}", path.as_path().display()), "/", "slash"),
+            path: str::replace(&format!("{}", path.as_path().display()), "/", REPLACEMENT),
             image_date_time_naive,
-            latitude_deg,
-            longitude_deg
+            latlon: LatLon {
+                latitude_deg,
+                longitude_deg,
+            },
         });
 
-
-        info!("Added file: {}", path
-            .as_path()
-            .display());
+        info!("Added file: {}", path.as_path().display());
     }
 
-    let first_date_time = images.iter().map(|image| image.image_date_time_naive.timestamp()).min().unwrap();
-    let last_date_time = images.iter().map(|image| image.image_date_time_naive.timestamp()).max().unwrap();
+    let first_date_time = images
+        .iter()
+        .map(|image| image.image_date_time_naive.timestamp())
+        .min()
+        .unwrap();
+    let last_date_time = images
+        .iter()
+        .map(|image| image.image_date_time_naive.timestamp())
+        .max()
+        .unwrap();
 
     images.sort_by_key(|a| a.image_date_time_naive.timestamp());
 
-    let t = PageTemplate{ 
+    let template = PageTemplate {
         images,
         first_date_time: first_date_time,
         last_date_time: last_date_time,
-        delta: Duration::days(args.delta)
+        delta: Duration::days(args.delta),
     };
 
     let app = axum::Router::new()
         .route("/", axum::routing::get(root))
         .route("/assets/:filename", axum::routing::get(asset))
-        .layer(Extension(t.clone()));
+        .layer(Extension(template.clone()));
 
     axum::Server::bind(&format!("0.0.0.0:{}", args.port).parse().unwrap())
         .serve(app.into_make_service())
@@ -207,8 +223,6 @@ async fn main() {
     println!("Listening on : localhost:{}", args.port);
 }
 
-async fn root(
-    Extension(images): Extension<PageTemplate>,
-) -> axum::response::Response {
+async fn root(Extension(images): Extension<PageTemplate>) -> axum::response::Response {
     images.into_response()
 }
