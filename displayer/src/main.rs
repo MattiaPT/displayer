@@ -20,7 +20,7 @@ use askama_axum::IntoResponse;
 use axum::extract::{self, Extension};
 use chrono::{Duration, NaiveDateTime};
 use clap::Parser;
-use log::info;
+use log::{info, warn, error};
 
 use exif::{self, In, Tag};
 use walkdir::WalkDir;
@@ -92,8 +92,8 @@ async fn asset(extract::Path(filename): extract::Path<String>) -> axum::response
     } else {
         return axum::http::StatusCode::NOT_FOUND.into_response();
     };
-    let res = ([("Content-Type", mime)], (&asset).to_vec()).into_response();
-    res
+
+    ([("Content-Type", mime)], (&asset).to_vec()).into_response()
 }
 
 async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
@@ -118,20 +118,21 @@ async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     let args = Flags::parse();
 
     let mut images = Vec::new();
 
     let files = fetch_files(&args.data).await;
-    let mut i: u64 = 0;
+    let mut id: u64 = 0;
     for path in files.into_iter() {
-        print!("\rDisplaying {} files", i);
         let file = fs::File::open(path.as_path()).unwrap();
         let mut bufreader = std::io::BufReader::new(&file);
         let exifreader = exif::Reader::new();
         let exif = match exifreader.read_from_container(&mut bufreader) {
             Ok(t) => t,
-            Err(_) => {
+            Err(e) => {
+                warn!("Error occured creating exif reader for {}: {}", path.as_path().display(), e);
                 continue;
             }
         };
@@ -141,28 +142,8 @@ async fn main() {
                 exif::Value::Rational(ref rationals) => rationals,
                 _ => unreachable!(),
             },
-            None => {
-                continue;
-            }
+            None => continue
         };
-        let date_time_original = match exif.get_field(Tag::DateTimeOriginal, In::PRIMARY) {
-            Some(field) => match field.value {
-                exif::Value::Ascii(ref ascii) => ascii,
-                _ => unreachable!(),
-            },
-            None => continue,
-        };
-        let image_date_time_naive = match NaiveDateTime::parse_from_str(
-            &String::from_utf8(date_time_original[0].clone()).unwrap(),
-            "%Y:%m:%d %H:%M:%S",
-        ) {
-            Ok(t) => t,
-            Err(e) => {
-                println!("{:?}", e);
-                std::process::exit(1)
-            }
-        };
-
         let longitude_deg = to_degrees(&exif::Value::Rational(longitude_vals.to_vec())).await;
 
         let latitude_vals = match exif.get_field(Tag::GPSLatitude, In::PRIMARY) {
@@ -170,16 +151,31 @@ async fn main() {
                 exif::Value::Rational(ref rationals) => rationals,
                 _ => unreachable!(),
             },
-            None => {
-                continue;
+            None => continue
+        };
+        let latitude_deg = to_degrees(&exif::Value::Rational(latitude_vals.to_vec())).await;
+
+        let date_time_original = match exif.get_field(Tag::DateTimeOriginal, In::PRIMARY) {
+            Some(field) => match field.value {
+                exif::Value::Ascii(ref ascii) => ascii,
+                _ => unreachable!(),
+            },
+            None => continue
+        };
+        let image_date_time_naive = match NaiveDateTime::parse_from_str(
+            &String::from_utf8(date_time_original[0].clone()).unwrap(),
+            "%Y:%m:%d %H:%M:%S",
+        ) {
+            Ok(t) => t,
+            Err(e) => {
+                error!("{:?}", e);
+                std::process::exit(1)
             }
         };
 
-        let latitude_deg = to_degrees(&exif::Value::Rational(latitude_vals.to_vec())).await;
-
-        i += 1;
+        id += 1;
         images.push(Image {
-            id: i,
+            id,
             path: str::replace(&format!("{}", path.as_path().display()), "/", REPLACEMENT),
             image_date_time_naive,
             latlon: LatLon {
@@ -187,9 +183,8 @@ async fn main() {
                 longitude_deg,
             },
         });
-
-        info!("Added file: {}", path.as_path().display());
     }
+    info!("Displaying {} files", id);
 
     let first_date_time = images
         .iter()
@@ -206,8 +201,8 @@ async fn main() {
 
     let template = PageTemplate {
         images,
-        first_date_time: first_date_time,
-        last_date_time: last_date_time,
+        first_date_time,
+        last_date_time,
         delta: Duration::days(args.delta),
     };
 
@@ -216,11 +211,11 @@ async fn main() {
         .route("/assets/:filename", axum::routing::get(asset))
         .layer(Extension(template.clone()));
 
+    info!("Listening on: http://localhost:{}", args.port);
     axum::Server::bind(&format!("0.0.0.0:{}", args.port).parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
-    println!("Listening on : localhost:{}", args.port);
 }
 
 async fn root(Extension(images): Extension<PageTemplate>) -> axum::response::Response {
