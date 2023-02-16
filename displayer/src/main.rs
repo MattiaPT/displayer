@@ -20,7 +20,7 @@ use askama_axum::IntoResponse;
 use axum::extract::{self, Extension};
 use chrono::{Duration, NaiveDateTime};
 use clap::Parser;
-use log::{info, warn, error};
+use log::{error, info, warn};
 
 use exif::{self, In, Tag};
 use walkdir::WalkDir;
@@ -61,7 +61,6 @@ struct LatLon {
 // TODO: fix path generation
 const REPLACEMENT: &str = "slash";
 
-
 async fn to_degrees(rationals: &exif::Value) -> f64 {
     let rationals = match *rationals {
         exif::Value::Rational(ref rationals) => rationals,
@@ -82,15 +81,15 @@ async fn asset(extract::Path(filename): extract::Path<String>) -> axum::response
     let f_name = str::replace(&filename, REPLACEMENT, "/");
     let asset = match tokio::fs::read(format!("{}", f_name)).await {
         Ok(a) => a,
-        Err(_) => {
+        Err(e) => {
+            warn!("Error reading file {}: {}", &filename, e);
             return axum::http::StatusCode::NOT_FOUND.into_response();
         }
     };
 
-    let mime = if let Some(mime) = mime_guess::from_path(f_name).first_raw() {
-        mime
-    } else {
-        return axum::http::StatusCode::NOT_FOUND.into_response();
+    let mime = match mime_guess::from_path(f_name).first_raw() {
+        Some(m) => m,
+        None => return axum::http::StatusCode::NOT_FOUND.into_response(),
     };
 
     ([("Content-Type", mime)], (&asset).to_vec()).into_response()
@@ -115,7 +114,6 @@ async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
     files
 }
 
-
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -126,13 +124,23 @@ async fn main() {
     let files = fetch_files(&args.data).await;
     let mut id: u64 = 0;
     for path in files.into_iter() {
-        let file = fs::File::open(path.as_path()).unwrap();
+        let file = match fs::File::open(path.as_path()) {
+            Ok(f) => f,
+            Err(e) => {
+                warn!("Error reading path {}: {}", path.as_path().display(), e);
+                continue;
+            }
+        };
         let mut bufreader = std::io::BufReader::new(&file);
         let exifreader = exif::Reader::new();
         let exif = match exifreader.read_from_container(&mut bufreader) {
             Ok(t) => t,
             Err(e) => {
-                warn!("Error occured creating exif reader for {}: {}", path.as_path().display(), e);
+                warn!(
+                    "Error occured creating exif reader for {}: {}",
+                    path.as_path().display(),
+                    e
+                );
                 continue;
             }
         };
@@ -142,7 +150,7 @@ async fn main() {
                 exif::Value::Rational(ref rationals) => rationals,
                 _ => unreachable!(),
             },
-            None => continue
+            None => continue,
         };
         let longitude_deg = to_degrees(&exif::Value::Rational(longitude_vals.to_vec())).await;
 
@@ -151,7 +159,7 @@ async fn main() {
                 exif::Value::Rational(ref rationals) => rationals,
                 _ => unreachable!(),
             },
-            None => continue
+            None => continue,
         };
         let latitude_deg = to_degrees(&exif::Value::Rational(latitude_vals.to_vec())).await;
 
@@ -160,7 +168,7 @@ async fn main() {
                 exif::Value::Ascii(ref ascii) => ascii,
                 _ => unreachable!(),
             },
-            None => continue
+            None => continue,
         };
         let image_date_time_naive = match NaiveDateTime::parse_from_str(
             &String::from_utf8(date_time_original[0].clone()).unwrap(),
@@ -168,7 +176,7 @@ async fn main() {
         ) {
             Ok(t) => t,
             Err(e) => {
-                error!("{:?}", e);
+                error!("Error occurred parsing NaiveDateTime from str: {:?}", e);
                 std::process::exit(1)
             }
         };
@@ -186,16 +194,28 @@ async fn main() {
     }
     info!("Displaying {} files", id);
 
-    let first_date_time = images
+    let first_date_time = match images
         .iter()
         .map(|image| image.image_date_time_naive.timestamp())
         .min()
-        .unwrap();
-    let last_date_time = images
+    {
+        Some(dt) => dt,
+        None => {
+            error!("Error occurred fetching first_date_time");
+            std::process::exit(1)
+        }
+    };
+    let last_date_time = match images
         .iter()
         .map(|image| image.image_date_time_naive.timestamp())
         .max()
-        .unwrap();
+    {
+        Some(dt) => dt,
+        None => {
+            error!("Error occurred fetching last_date_time");
+            std::process::exit(1)
+        }
+    };
 
     images.sort_by_key(|a| a.image_date_time_naive.timestamp());
 
