@@ -31,8 +31,6 @@ struct Flags {
     port: u16,
     #[clap(long)]
     data: PathBuf,
-    #[clap(long)]
-    delta: i64,
 }
 
 #[derive(Template, Clone)]
@@ -60,6 +58,7 @@ struct LatLon {
 
 // TODO: fix path generation
 const REPLACEMENT: &str = "slash";
+const DELTA: i64 = 3;
 
 async fn to_degrees(rationals: &exif::Value) -> f64 {
     let rationals = match *rationals {
@@ -223,7 +222,7 @@ async fn main() {
         images,
         first_date_time,
         last_date_time,
-        delta: Duration::days(args.delta),
+        delta: Duration::days(DELTA),
     };
 
     let app = axum::Router::new()
