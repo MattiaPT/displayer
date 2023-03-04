@@ -41,6 +41,6 @@ input[type="range"]::-moz-range-track {
   background-color: #9a905d;
 }
 
-#sliderState {
+#sliderStateTD {
   text-align: center;
 }

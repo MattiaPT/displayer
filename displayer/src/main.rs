@@ -17,7 +17,10 @@ use std::{ffi::OsStr, fs, path::PathBuf};
 
 use askama::Template;
 use askama_axum::IntoResponse;
-use axum::{ http::Response, extract::{self, Extension}};
+use axum::{
+    extract::{self, Extension},
+    http::Response,
+};
 use chrono::{Duration, NaiveDateTime};
 use clap::Parser;
 use log::{error, info, warn};
@@ -94,9 +97,22 @@ async fn asset_get(extract::Path(filename): extract::Path<String>) -> axum::resp
     ([("Content-Type", mime)], (&asset).to_vec()).into_response()
 }
 
-async fn src_get(extract::Path(filename): extract::Path<String>) -> impl IntoResponse {
-    let markup = tokio::fs::read_to_string(format!("src/{}", filename)).await.unwrap();
-    Response::builder().header("content-type", "text/css;charset=utf-8").body(markup).unwrap()
+async fn src_get_css(extract::Path(filename): extract::Path<String>) -> impl IntoResponse {
+    let markup = tokio::fs::read(format!("src/{}", filename)).await.unwrap();
+    match std::path::Path::new(&filename)
+        .extension()
+        .unwrap()
+        .to_str()
+        .unwrap()
+    {
+        "ico" => ([("Content-Type", "image/x-icon")], markup).into_response(),
+        "css" => Response::builder()
+            .header("content-type", "text/css;charset=utf-8")
+            .body(String::from_utf8(markup).unwrap())
+            .unwrap()
+            .into_response(),
+        &_ => ().into_response(),
+    }
 }
 
 async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
@@ -233,7 +249,7 @@ async fn main() {
     let app = axum::Router::new()
         .route("/", axum::routing::get(root))
         .route("/assets/:filename", axum::routing::get(asset_get))
-        .route("/src/:filename", axum::routing::get(src_get))
+        .route("/src/:filename", axum::routing::get(src_get_css))
         .layer(Extension(template.clone()));
 
     info!("Listening on: http://localhost:{}", args.port);
