@@ -13,4 +13,4 @@ Meaning of flags: <br/>
 -> recursive search for images in DIRECTORY_PATH
 
 ## Preview
-![image](https://user-images.githubusercontent.com/52134864/219718448-fdd1dd5b-79eb-4ecf-9821-9bb82ccb3cdf.png)
+![image](https://user-images.githubusercontent.com/52134864/222930364-57070b10-b1c6-4b79-ad51-96030b7596d9.png)
