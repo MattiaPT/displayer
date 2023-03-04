@@ -41,6 +41,23 @@ input[type="range"]::-moz-range-track {
   background-color: #9a905d;
 }
 
+table {
+  height: 100%;
+  width: 100%;
+}
+
 #sliderStateTD {
   text-align: center;
+}
+
+#optionsButton, #velocitySign {
+  color: #202124; 
+  background-color: #13bba4 !important; 
+  border-color: #202124; 
+  width: 100%;
+}
+
+#splitButton {
+  text-align: center; 
+  width: 5%;
 }

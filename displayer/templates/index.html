@@ -15,26 +15,26 @@
 	<link type="text/css" rel="stylesheet" href="src/style.css" />
 </head>
 <body>
-	<table style="height: 100%; width: 100%;">
+	<table>
 		<tr>
 			<td style="width: 75%; height: 100%;">
 				<div id="map"></div>
 			</td>
 			<td>
-				<table id="content" style="height: 100%; width: 100%;">
+				<table id="content">
 					<tr style="height: 2%;"><td></td></tr>
 					<tr style="height: 8%; width: 100%; "><td>
-						<table style="height: 100%; width: 100%; ">
+						<table>
 							<tr>
-								<td style="text-align: center; width: 5%;">
-									<button class="btn btn-primary" type="button" onclick="playSlideShow()" style="color: #202124; background-color: #13bba4 !important; border-color: #202124; width: 100%;">
+								<td id="splitButton">
+									<button id="optionsButton" class="btn btn-primary" type="button" onclick="playSlideShow()">
 										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#202124" class="bi bi-play" viewBox="0 0 16 16">
 			 								<path d="M10.804 8 5 4.633v6.734L10.804 8zm.792-.696a.802.802 0 0 1 0 1.392l-6.363 3.692C4.713 12.69 4 12.345 4 11.692V4.308c0-.653.713-.998 1.233-.696l6.363 3.692z"/>
 										</svg>
 									</button>
 								</td>
-								<td style="text-align: center; width: 5%;">
-									<button class="btn btn-primary" type="button" onclick="stopSlideShow()" style="color: #202124; background-color: #13bba4 !important; border-color: #202124; width: 100%;">
+								<td id="splitButton">
+									<button id="optionsButton" class="btn btn-primary" type="button" onclick="stopSlideShow()">
 										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause" viewBox="0 0 16 16">
 										  <path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/>
 										</svg>
@@ -56,7 +56,7 @@
 							</tr>
 							<tr>
 								<td colspan="2">
-									<button id="velocitySign" class="btn btn-primary" type="button" onclick="changeSlideshowVelocity()" style="color: #202124; background-color: #13bba4 !important; border-color: #202124; width: 100%;">
+									<button id="velocitySign" class="btn btn-primary" type="button" onclick="changeSlideshowVelocity()">
 										[+]
 									</button>
 								</td>
@@ -118,7 +118,7 @@
 
 		window.marker{{ image.id }}.addListener("click", () => {
 			document.getElementById("image").src = "assets/{{ image.path }}";
-			document.getElementById("imageDate").innerHTML = "(" + (new Date({{ image.image_date_time_naive.timestamp() }}*1000)).toLocaleDateString("en-US", options) + ")";
+			document.getElementById("imageDate").innerHTML = "[" + (new Date({{ image.image_date_time_naive.timestamp() }}*1000)).toLocaleDateString("en-US", options) + "]";
 			slider.value = {{ image.image_date_time_naive.timestamp() }};
 			window.marker{{ image.id }}.setAnimation(google.maps.Animation.BOUNCE);
 			if (currentlyBouncing != null) {
@@ -192,7 +192,7 @@
 			.then((response) => {
 				const location = response.results[0].formatted_address;
 
-				document.getElementById("imageDate").innerHTML = "(" + (new Date(timestamp*1000)).toLocaleDateString("en-US", options) + " - " + location + ")";
+				document.getElementById("imageDate").innerHTML = "[" + (new Date(timestamp*1000)).toLocaleDateString("en-US", options) + "] - " + location;
 				
 			});
 		document.getElementById("image").src = imagePath;
