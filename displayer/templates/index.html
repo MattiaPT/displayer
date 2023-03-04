@@ -56,8 +56,8 @@
 							</tr>
 							<tr>
 								<td colspan="2">
-									<button class="btn btn-primary" type="button" onclick="displayAll()" style="color: #202124; background-color: #13bba4 !important; border-color: #202124">
-										slideshow
+									<button id="velocitySign" class="btn btn-primary" type="button" onclick="changeSlideshowVelocity()" style="color: #202124; background-color: #13bba4 !important; border-color: #202124; width: 100%;">
+										[+]
 									</button>
 								</td>
 							</tr>
@@ -77,12 +77,20 @@
 <script>
 	// TODO: fix path generation
 	const REPLACEMENT = "slash";
+	// in 10th of seconds
+	const FAST_SLIDESHOW_DURATION = 100;
+	const SLOW_SLIDESHOW_DURATION = 600;
 
 	var options = { year: 'numeric', month: 'numeric', day: 'numeric' };
 	var slider = document.getElementById("date");
 	var slideShowStatus = false;
 	var currentlyBouncing = null;
 	var geocoder;
+
+	var fastSlideshow = {{ last_date_time - first_date_time }} / FAST_SLIDESHOW_DURATION;
+	var slowSlideshow = {{ last_date_time - first_date_time }} / SLOW_SLIDESHOW_DURATION;
+
+	var slideShowVelocity = fastSlideshow;
 
 	function initMap() {
 		geocoder = new google.maps.Geocoder();
@@ -140,7 +148,7 @@
 		    if (!slideShowStatus || {{ last_date_time }} == parseInt(slider.value)) {
 		    	clearInterval(thisInterval);
 		    }
-		    document.getElementById('date').value = parseInt(document.getElementById('date').value) + 3600;
+		    document.getElementById('date').value = parseInt(document.getElementById('date').value) + slideShowVelocity;
 		    sliderChanged();
 		}, 100);
 	}
@@ -175,18 +183,32 @@
 	{% endfor %}
 		document.getElementById("sliderState").innerHTML = (new Date(slider.value*1000)).toLocaleDateString("en-US", options);
 
-		document.getElementById("image").src = imagePath;
+		if (document.getElementById("image").src == "http://localhost:8000/" + imagePath.replaceAll(" ", "%20")) {
+			return;
+		}
+
 		geocoder
 			.geocode({ location: closestMarker.position })
 			.then((response) => {
 				const location = response.results[0].formatted_address;
+
 				document.getElementById("imageDate").innerHTML = "(" + (new Date(timestamp*1000)).toLocaleDateString("en-US", options) + " - " + location + ")";
 				
 			});
-
-		document.getElementById("imageDate").innerHTML = "(" + (new Date(timestamp*1000)).toLocaleDateString("en-US", options) + " - " + location + ")";
+		document.getElementById("image").src = imagePath;
 		closestMarker.setAnimation(google.maps.Animation.BOUNCE);
 		currentlyBouncing = closestMarker;
+	}
+
+	
+	function changeSlideshowVelocity() {
+		if (slideShowVelocity == slowSlideshow) {
+			slideShowVelocity = fastSlideshow;
+			document.getElementById("velocitySign").innerHTML = "[+]";
+		} else {
+			slideShowVelocity = slowSlideshow;
+			document.getElementById("velocitySign").innerHTML = "[-]";
+		}
 	}
 </script>
 <script 
