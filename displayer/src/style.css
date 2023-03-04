@@ -1,0 +1,46 @@
+#map {
+	height: 100%;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	background-color: #202124;
+	color: white;
+}
+
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+    input[type='range'] {
+      overflow: hidden;
+      width: 80%;
+      -webkit-appearance: none;
+    }
+    
+    input[type='range']::-webkit-slider-runnable-track {
+      height: 10px;
+      -webkit-appearance: none;
+      color: #13bba4;
+      margin-top: -1px;
+    }
+    
+    input[type='range']::-webkit-slider-thumb {
+      width: 10px;
+      -webkit-appearance: none;
+      height: 10px;
+      cursor: ew-resize;
+      background: #a8a8a8;
+      box-shadow: -300px 0 0 300px #43e5f7;
+    }
+}
+input[type="range"]::-moz-range-progress {
+  background-color: #13bba4; 
+}
+input[type="range"]::-moz-range-track {  
+  background-color: #9a905d;
+}
+
+#sliderState {
+  text-align: center;
+}

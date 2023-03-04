@@ -17,7 +17,7 @@ use std::{ffi::OsStr, fs, path::PathBuf};
 
 use askama::Template;
 use askama_axum::IntoResponse;
-use axum::extract::{self, Extension};
+use axum::{ http::Response, extract::{self, Extension}};
 use chrono::{Duration, NaiveDateTime};
 use clap::Parser;
 use log::{error, info, warn};
@@ -76,7 +76,7 @@ async fn to_degrees(rationals: &exif::Value) -> f64 {
     total
 }
 
-async fn asset(extract::Path(filename): extract::Path<String>) -> axum::response::Response {
+async fn asset_get(extract::Path(filename): extract::Path<String>) -> axum::response::Response {
     let f_name = str::replace(&filename, REPLACEMENT, "/");
     let asset = match tokio::fs::read(format!("{}", f_name)).await {
         Ok(a) => a,
@@ -92,6 +92,11 @@ async fn asset(extract::Path(filename): extract::Path<String>) -> axum::response
     };
 
     ([("Content-Type", mime)], (&asset).to_vec()).into_response()
+}
+
+async fn src_get(extract::Path(filename): extract::Path<String>) -> impl IntoResponse {
+    let markup = tokio::fs::read_to_string(format!("src/{}", filename)).await.unwrap();
+    Response::builder().header("content-type", "text/css;charset=utf-8").body(markup).unwrap()
 }
 
 async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
@@ -227,7 +232,8 @@ async fn main() {
 
     let app = axum::Router::new()
         .route("/", axum::routing::get(root))
-        .route("/assets/:filename", axum::routing::get(asset))
+        .route("/assets/:filename", axum::routing::get(asset_get))
+        .route("/src/:filename", axum::routing::get(src_get))
         .layer(Extension(template.clone()));
 
     info!("Listening on: http://localhost:{}", args.port);

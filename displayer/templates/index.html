@@ -4,55 +4,12 @@
 	<title>Displayer</title>
     <link rel=”stylesheet” href=”https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css”/>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
+    <link type="text/css" rel="stylesheet" href="src/style.css" />
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script>
 	<script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
 	<script src="https://d3js.org/d3.v7.min.js"></script>
 	<script type="text/javascript" src="https://code.jquery.com/jquery-1.7.1.min.js"></script>
 	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/ion-rangeslider/2.3.1/js/ion.rangeSlider.min.js"></script>
-	<style type="text/css">
-		#map {
-			height: 100%;
-		}
-
-		html,
-		body {
-			height: 100%;
-			margin: 0;
-			padding: 0;
-			background-color: #202124;
-			color: white;
-		}
-
-		@media screen and (-webkit-min-device-pixel-ratio:0) {
-		    input[type='range'] {
-		      overflow: hidden;
-		      width: 80%;
-		      -webkit-appearance: none;
-		    }
-		    
-		    input[type='range']::-webkit-slider-runnable-track {
-		      height: 10px;
-		      -webkit-appearance: none;
-		      color: #13bba4;
-		      margin-top: -1px;
-		    }
-		    
-		    input[type='range']::-webkit-slider-thumb {
-		      width: 10px;
-		      -webkit-appearance: none;
-		      height: 10px;
-		      cursor: ew-resize;
-		      background: #a8a8a8;
-		      box-shadow: -300px 0 0 300px #43e5f7;
-		    }
-		}
-		input[type="range"]::-moz-range-progress {
-		  background-color: #13bba4; 
-		}
-		input[type="range"]::-moz-range-track {  
-		  background-color: #9a905d;
-		}
-	</style>
 </head>
 <body>
 	<table style="height: 100%; width: 100%;">
@@ -89,6 +46,9 @@
 									<button class="btn btn-primary" type="button" onclick="displayAll()" style="color: #202124; background-color: #13bba4 !important; border-color: #202124">
 										Display All
 									</button>
+								</td>
+								<td>
+									<output id="sliderState"></output>
 								</td>
 							</tr>
 						</table>
@@ -200,6 +160,8 @@
 		}
 		window.marker{{ image.id }}.setAnimation(null);
 	{% endfor %}
+		document.getElementById("sliderState").innerHTML = (new Date(slider.value*1000)).toLocaleDateString("en-US", options);
+
 		document.getElementById("image").src = imagePath;
 		document.getElementById("imageDate").innerHTML = "(" + (new Date(timestamp*1000)).toLocaleDateString("en-US", options) + ")";
 		closestMarker.setAnimation(google.maps.Animation.BOUNCE);
