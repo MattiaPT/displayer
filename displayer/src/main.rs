@@ -13,7 +13,7 @@
 
     - https://developers.google.com/maps/documentation/javascript/examples/overlay-simple#maps_overlay_simple-javascript
 */
-use std::{ffi::OsStr, fs, path::PathBuf};
+use std::{env, ffi::OsStr, fs, path::PathBuf};
 
 use askama::Template;
 use askama_axum::IntoResponse;
@@ -43,6 +43,8 @@ struct PageTemplate {
     first_date_time: i64,
     last_date_time: i64,
     delta: Duration,
+
+    google_maps_api_key: String,
 }
 
 #[derive(Clone)]
@@ -244,6 +246,7 @@ async fn main() {
         first_date_time,
         last_date_time,
         delta: Duration::days(DELTA),
+        google_maps_api_key: env::var("GOOGLE_MAPS_API_KEY").unwrap(),
     };
 
     let app = axum::Router::new()
