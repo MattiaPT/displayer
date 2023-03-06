@@ -2,6 +2,11 @@
 
 An imaging tool aimed to visualize location data contained in images.
 
+## Setup
+clone this repository and get your google maps api key, then add this line to ~/.bashrc
+```
+export GOOGLE_MAPS_API_KEY=<your_api_key>
+```
 
 ## Usage
 ```
