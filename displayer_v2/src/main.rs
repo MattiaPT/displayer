@@ -14,10 +14,6 @@ use log::{info, warn};
 
 use exif::{In, Reader, Tag};
 
-async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
-    vec![]
-}
-
 #[derive(Parser)]
 struct Flags {
     #[clap(long)]
@@ -26,19 +22,39 @@ struct Flags {
     data: PathBuf,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Image {
     id: u64,
-    path: String,
+    path: PathBuf,
     image_date_time: NaiveDateTime,
     latlonalt: LatLonAlt,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct LatLonAlt {
     latitude_deg: f64,
     longitude_deg: f64,
     altitude_m: i32,
+}
+
+async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
+    vec![]
+}
+
+async fn rationals_to_degrees(rationals: &exif::Value) -> f64 {
+    let rationals = match *rationals {
+        exif::Value::Rational(ref rationals) => rationals,
+        _ => unreachable!(),
+    };
+
+    let mut total = 0.0;
+    let mut weight = 1.0;
+    for i in 0..3 {
+        total += (rationals[i].num as f64) / (rationals[i].denom as f64) * weight;
+        weight /= 60.0;
+    }
+
+    total
 }
 
 #[tokio::main]
@@ -46,12 +62,16 @@ async fn main() {
     env_logger::init();
     let args = Flags::parse();
 
+    let mut images: Vec<Image> = Vec::new();
+
     let files = fetch_files(&args.data).await;
     for path in files.into_iter() {
+        let debug_info = path.as_path().display();
+
         let file = match fs::File::open(path.as_path()) {
             Ok(f) => f,
             Err(e) => {
-                warn!("Error opening {}: {}", path.as_path().display(), e);
+                warn!("Error opening {}: {}", debug_info, e);
                 continue;
             }
         };
@@ -61,39 +81,48 @@ async fn main() {
         let exif = match exifreader.read_from_container(&mut bufreader) {
             Ok(t) => t,
             Err(e) => {
-                warn!(
-                    "Error reading or parsing attributes for {}: {}",
-                    path.as_path().display(),
-                    e
-                );
+                warn!("Error reading/parsing attributes for {}: {}", debug_info, e);
                 continue;
             }
         };
 
         let longitude_vec = match exif.get_field(Tag::GPSLongitude, In::PRIMARY) {
-            Some(field) => match field.value {
-                exif::Value::Rational(ref rationals) => rationals,
-                _ => unreachable!(),
-            },
+            Some(field) => &field.value,
             None => continue,
         };
-
         let latitude_vec = match exif.get_field(Tag::GPSLatitude, In::PRIMARY) {
-            Some(field) => match field.value {
-                exif::Value::Rational(ref rationals) => rationals,
-                _ => unreachable!(),
-            },
+            Some(field) => &field.value,
             None => continue,
         };
-
         let date_time_original = match exif.get_field(Tag::DateTimeOriginal, In::PRIMARY) {
-            Some(field) => match field.value {
-                exif::Value::Ascii(ref ascii) => ascii,
+            Some(field) => match &field.value {
+                exif::Value::Ascii(ref ascii) => String::from_utf8(ascii[0].clone()).unwrap(),
                 _ => unreachable!(),
             },
             None => continue,
         };
+        let image_date_time =
+            match NaiveDateTime::parse_from_str(&date_time_original, "%Y:%m:%d %H:%M:%S") {
+                Ok(t) => t,
+                Err(e) => {
+                    warn!("Error parsing NaiveDateTime for {}: {}", debug_info, e);
+                    continue;
+                }
+            };
+
+        // FIXME: altitude_m
+        let latlonalt = LatLonAlt {
+            latitude_deg: rationals_to_degrees(&latitude_vec).await,
+            longitude_deg: rationals_to_degrees(&longitude_vec).await,
+            altitude_m: 0,
+        };
+        images.push(Image {
+            id: 0,
+            path,
+            image_date_time,
+            latlonalt,
+        });
     }
 
-    println!("Hello, world!");
+    println!("{:#?}", images);
 }
