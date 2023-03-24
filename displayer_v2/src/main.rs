@@ -6,10 +6,11 @@
  *
  */
 
-use std::{env, fs, io::BufReader, path::PathBuf};
+use std::{env, ffi::OsStr, fs, io::BufReader, path::PathBuf};
 
 use chrono::NaiveDateTime;
 use clap::Parser;
+use futures::future::{BoxFuture, FutureExt};
 use log::{info, warn};
 
 use exif::{In, Reader, Tag};
@@ -37,8 +38,24 @@ struct LatLonAlt {
     altitude_m: i32,
 }
 
-async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
-    vec![]
+const IMAGE_TYPES: [&str; 3] = ["JPG", "JPEG", "PNG"];
+
+fn fetch_files(directory: &PathBuf, files: &mut Vec<PathBuf>) {
+    async move {
+        for entry in directory.read_dir().unwrap() {
+            if let Ok(entry) = entry {
+                let path = PathBuf::from(entry.path());
+                if path.is_dir() {
+                    fetch_files(&path, files);
+                } else if IMAGE_TYPES.iter().any(|extension| {
+                    path.extension() != None && path.extension().unwrap() == OsStr::new(extension)
+                }) {
+                    files.push(path);
+                }
+            }
+        }
+    }
+    .boxed();
 }
 
 async fn rationals_to_degrees(rationals: &exif::Value) -> f64 {
@@ -64,7 +81,8 @@ async fn main() {
 
     let mut images: Vec<Image> = Vec::new();
 
-    let files = fetch_files(&args.data).await;
+    let mut files: Vec<PathBuf> = Vec::new();
+    fetch_files(&args.data, &mut files);
     for path in files.into_iter() {
         let debug_info = path.as_path().display();
 
