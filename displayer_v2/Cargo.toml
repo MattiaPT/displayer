@@ -6,10 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+askama = { git = "https://github.com/djc/askama.git", rev = "fc779e22c3bfa0e94df208a88a361b99e28a9129", features = ["config", "with-axum"]}
+askama_axum = { git = "https://github.com/djc/askama.git", rev = "fc779e22c3bfa0e94df208a88a361b99e28a9129"}
+axum = "0.5.0"
 chrono = "0.4.24"
 clap = { version = "4.1.11", features = ["derive"] }
 env_logger = "0.10.0"
 futures = "0.3.27"
 kamadak-exif = "0.5.5"
 log = "0.4.17"
-tokio = { version = "1.26.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.26.0", features = ["macros", "rt-multi-thread", "rt"] }

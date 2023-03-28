@@ -3,12 +3,64 @@
         <title>Displayer v2</title>
         <script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
         <script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
+
+        <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
+        <script src="https://unpkg.com/@deck.gl/carto@latest/dist.min.js"></script>
+
+        <script src="https://unpkg.com/maplibre-gl@2.1.9/dist/maplibre-gl.js"></script>
+        <link href="https://unpkg.com/maplibre-gl@2.1.9/dist/maplibre-gl.css" rel="stylesheet" />
     </head>
     <body>
-
+        <div id="container"></div>
     </body>
 
     <script>
+
+     console.log("LOADING MAP");
+
+     const ICON_MAPPING = {
+         marker: {x: 0, y: 0, width: 128, height: 128, mask: true}
+     };
+
+     const deckgl = new deck.DeckGL({
+         container: "container",
+         map: maplibregl,
+         mapStyle: deck.carto.BASEMAP.VOYAGER,
+
+         initialViewState: {
+             latitude: 47.36667,
+             longitude: 8.55,
+             zoom: 3,
+         },
+         controller: true,
+
+         layers: []
+     });
+
+     const socket = new WebSocket("ws://" + location.host + "/displayer");
+
+     socket.addEventListener("open", function (event) {
+         socket.send("Initiated");
+     });
+
+     socket.addEventListener("message", function (event) {
+         let data = JSON.parse(event.data);
+         let icon_layer = new IconLayer({
+             id: "icon-layer",
+             data,
+             pickable: true,
+
+             iconAtlas: 'https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-atlas.png',
+             iconMapping: ICON_MAPPING,
+             getIcon: d => 'marker',
+
+             sizeScale: 10,
+             getPosition: d => d.coordinates,
+             getSize: d => 5,
+             getColor: [255, 0, 0]
+         });
+         deckgl.setProps({layers:[icon_layer]})
+     });
 
     </script>
 </html>

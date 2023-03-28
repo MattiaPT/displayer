@@ -13,6 +13,12 @@ use clap::Parser;
 use futures::future::{BoxFuture, FutureExt};
 use log::{info, warn};
 
+use askama::Template;
+use askama_axum::IntoResponse;
+use axum::{
+    extract::{self, Extension},
+    http::Response,
+};
 use exif::{In, Reader, Tag};
 
 #[derive(Parser)]
@@ -37,6 +43,10 @@ struct LatLonAlt {
     longitude_deg: f64,
     altitude_m: i32,
 }
+
+#[derive(Template, Clone)]
+#[template(path = "index.html")]
+struct PageTemplate {}
 
 const IMAGE_TYPES: [&str; 3] = ["JPG", "JPEG", "PNG"];
 
@@ -74,11 +84,7 @@ async fn rationals_to_degrees(rationals: &exif::Value) -> f64 {
     total
 }
 
-#[tokio::main]
-async fn main() {
-    env_logger::init();
-    let args = Flags::parse();
-
+async fn generate_display(args: &Flags) {
     let mut images: Vec<Image> = Vec::new();
 
     let mut files: Vec<PathBuf> = Vec::new();
@@ -112,6 +118,13 @@ async fn main() {
             Some(field) => &field.value,
             None => continue,
         };
+        let altitude_m = match exif.get_field(Tag::GPSAltitude, In::PRIMARY) {
+            Some(field) => match &field.value {
+                exif::Value::Rational(ref rational) => rational[0].num as i32,
+                _ => unreachable!(),
+            },
+            None => 0,
+        };
         let date_time_original = match exif.get_field(Tag::DateTimeOriginal, In::PRIMARY) {
             Some(field) => match &field.value {
                 exif::Value::Ascii(ref ascii) => String::from_utf8(ascii[0].clone()).unwrap(),
@@ -128,11 +141,11 @@ async fn main() {
                 }
             };
 
-        // FIXME: altitude_m
+        // TODO: test altitude_m
         let latlonalt = LatLonAlt {
             latitude_deg: rationals_to_degrees(&latitude_vec).await,
             longitude_deg: rationals_to_degrees(&longitude_vec).await,
-            altitude_m: 0,
+            altitude_m,
         };
         images.push(Image {
             id: 0,
@@ -142,5 +155,34 @@ async fn main() {
         });
     }
 
-    println!("{:#?}", images);
+    info!("Fetched {} images", images.len());
+}
+
+async fn load_map() -> axum::response::Response {
+    info!("Loading map");
+    PageTemplate {}.into_response()
+}
+
+async fn load_icons() -> axum::response::Response {
+    info!("Loading icons");
+    PageTemplate {}.into_response()
+}
+
+#[tokio::main]
+async fn main() {
+    env_logger::init();
+    let args = Flags::parse();
+
+    info!("Starting display generation");
+    generate_display(&args).await;
+    info!("Display generation finished");
+
+    let app = axum::Router::new()
+        .route("/", axum::routing::get(load_map))
+        .route("/displayer", axum::routing::get(load_icons));
+
+    info!("Listening on: http://localhost:{}", args.port);
+    let _ = axum::Server::bind(&format!("0.0.0.0:{}", args.port).parse().unwrap())
+        .serve(app.into_make_service())
+        .await;
 }
