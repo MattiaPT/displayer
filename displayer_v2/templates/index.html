@@ -40,7 +40,7 @@
      const socket = new WebSocket("ws://" + location.host + "/displayer");
 
      socket.addEventListener("open", function (event) {
-         socket.send("Initiated");
+         socket.send("Ready");
      });
 
      socket.addEventListener("message", function (event) {

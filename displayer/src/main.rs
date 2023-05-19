@@ -44,6 +44,8 @@ struct PageTemplate {
     last_date_time: i64,
     delta: Duration,
 
+    total_distance_m: u64,
+
     google_maps_api_key: String,
 }
 
@@ -55,7 +57,7 @@ struct Image {
     latlon: LatLon,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct LatLon {
     latitude_deg: f64,
     longitude_deg: f64,
@@ -64,6 +66,7 @@ struct LatLon {
 // TODO: fix path generation
 const REPLACEMENT: &str = "slash";
 const DELTA: i64 = 3;
+const EARTH_SCOPE: f64 = 40075017.0;
 
 async fn to_degrees(rationals: &exif::Value) -> f64 {
     let rationals = match *rationals {
@@ -73,8 +76,8 @@ async fn to_degrees(rationals: &exif::Value) -> f64 {
 
     let mut total = 0.0;
     let mut weight = 1.0;
-    for i in 0..3 {
-        total += rationals[i].num as f64 / rationals[i].denom as f64 * weight;
+    for rational in rationals {
+        total += rational.num as f64 / rational.denom as f64 * weight;
         weight /= 60.0;
     }
 
@@ -83,7 +86,7 @@ async fn to_degrees(rationals: &exif::Value) -> f64 {
 
 async fn asset_get(extract::Path(filename): extract::Path<String>) -> axum::response::Response {
     let f_name = str::replace(&filename, REPLACEMENT, "/");
-    let asset = match tokio::fs::read(format!("{}", f_name)).await {
+    let asset = match tokio::fs::read(f_name.to_string()).await {
         Ok(a) => a,
         Err(e) => {
             warn!("Error reading file {}: {}", &filename, e);
@@ -96,7 +99,7 @@ async fn asset_get(extract::Path(filename): extract::Path<String>) -> axum::resp
         None => return axum::http::StatusCode::NOT_FOUND.into_response(),
     };
 
-    ([("Content-Type", mime)], (&asset).to_vec()).into_response()
+    ([("Content-Type", mime)], asset.to_vec()).into_response()
 }
 
 async fn src_get_css(extract::Path(filename): extract::Path<String>) -> impl IntoResponse {
@@ -126,7 +129,7 @@ async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
         .filter_map(|file| file.ok())
     {
         if !["JPG", "JPEG", "PNG"].iter().any(|extension| {
-            file.path().extension() != None
+            file.path().extension().is_some()
                 && OsStr::new(extension) == file.path().extension().unwrap().to_ascii_uppercase()
         }) {
             continue;
@@ -134,6 +137,22 @@ async fn fetch_files(directory: &PathBuf) -> Vec<PathBuf> {
         files.push(file.path().to_path_buf());
     }
     files
+}
+
+fn compute_total_distance(images: Vec<Image>) -> u64 {
+    let mut total_distance_m = 0;
+    for i in 1..images.len() {
+        total_distance_m += distance_m(images[i - 1].latlon, images[i].latlon);
+    }
+    total_distance_m
+}
+fn distance_m(point1: LatLon, point2: LatLon) -> u64 {
+    let distance = (point1.latitude_deg.sin() * point2.latitude_deg.sin()
+        + point1.latitude_deg.cos()
+            * point2.latitude_deg.cos()
+            * (point2.longitude_deg - point1.longitude_deg).cos())
+        * 6371.0;
+    distance as u64
 }
 
 #[tokio::main]
@@ -145,6 +164,7 @@ async fn main() {
 
     let files = fetch_files(&args.data).await;
     let mut id: u64 = 0;
+
     for path in files.into_iter() {
         let file = match fs::File::open(path.as_path()) {
             Ok(f) => f,
@@ -214,6 +234,11 @@ async fn main() {
             },
         });
     }
+
+    if id == 0 {
+        info!("No images to be displayed, quitting...");
+        return;
+    }
     info!("Displaying {} files", id);
 
     let first_date_time = match images
@@ -242,10 +267,11 @@ async fn main() {
     images.sort_by_key(|a| a.image_date_time_naive.timestamp());
 
     let template = PageTemplate {
-        images,
+        images: images.clone(),
         first_date_time,
         last_date_time,
         delta: Duration::days(DELTA),
+        total_distance_m: compute_total_distance(images),
         google_maps_api_key: env::var("GOOGLE_MAPS_API_KEY").unwrap(),
     };
 

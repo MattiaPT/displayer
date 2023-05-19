@@ -7,19 +7,15 @@ edition = "2021"
 
 [dependencies]
 lazy_static = "1.4.0"
-tera = "1"
-image = "0.23.0"
 askama = { git = "https://github.com/djc/askama.git", rev = "fc779e22c3bfa0e94df208a88a361b99e28a9129", features = ["config", "with-axum"]}
 axum = "0.5.0"
 askama_axum = { git = "https://github.com/djc/askama.git", rev = "fc779e22c3bfa0e94df208a88a361b99e28a9129"}
-tokio = { version = "1.25.0", features = ["macros", "rt-multi-thread", "fs"] }
+tokio = { version = "1.26.0", features = ["macros", "rt-multi-thread", "rt", "fs"] }
 log = "0.4.17"
-clap = { version = "4.1.4", features = ["derive"] }
+clap = { version = "4.1.11", features = ["derive"] }
 kamadak-exif = "0.5.5"
 mime_guess = "2.0.4"
-http-body = "0.4.5"
 walkdir = "2"
-hyper = "0.14"
-chrono = "0.4.23"
+chrono = "0.4.24"
 env_logger = "0.10.0"
-base64 = "0.21.0"
+
