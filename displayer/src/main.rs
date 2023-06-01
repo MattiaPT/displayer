@@ -23,6 +23,7 @@ use axum::{
 };
 use chrono::{Duration, NaiveDateTime};
 use clap::Parser;
+use geoutils::Location;
 use log::{error, info, warn};
 
 use exif::{self, In, Tag};
@@ -66,7 +67,6 @@ struct LatLon {
 // TODO: fix path generation
 const REPLACEMENT: &str = "slash";
 const DELTA: i64 = 3;
-const EARTH_SCOPE: f64 = 40075017.0;
 
 async fn to_degrees(rationals: &exif::Value) -> f64 {
     let rationals = match *rationals {
@@ -147,11 +147,9 @@ fn compute_total_distance(images: Vec<Image>) -> u64 {
     total_distance_m
 }
 fn distance_m(point1: LatLon, point2: LatLon) -> u64 {
-    let distance = (point1.latitude_deg.sin() * point2.latitude_deg.sin()
-        + point1.latitude_deg.cos()
-            * point2.latitude_deg.cos()
-            * (point2.longitude_deg - point1.longitude_deg).cos())
-        * 6371.0;
+    let a = Location::new(point1.latitude_deg, point1.longitude_deg);
+    let b = Location::new(point2.latitude_deg, point2.longitude_deg);
+    let distance = a.distance_to(&b).unwrap().meters();
     distance as u64
 }
 
